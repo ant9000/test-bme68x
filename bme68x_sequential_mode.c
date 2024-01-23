@@ -5,9 +5,8 @@
 #include "common.h"
 #include "ztimer.h"
 
-int bme68x_sequential_mode(void)
+int bme68x_sequential_mode(struct bme68x_dev *bme)
 {
-    struct bme68x_dev bme;
     int8_t rslt;
     struct bme68x_conf conf;
     struct bme68x_heatr_conf heatr_conf;
@@ -23,18 +22,8 @@ int bme68x_sequential_mode(void)
     /* Heating duration in milliseconds */
     uint16_t dur_prof[10] = { 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 };
 
-    /* Interface preference is updated as a parameter
-     * For I2C : BME68X_I2C_INTF
-     * For SPI : BME68X_SPI_INTF
-     */
-    rslt = bme68x_interface_init(&bme, BME68X_I2C_INTF);
-    bme68x_check_rslt("bme68x_interface_init", rslt);
-
-    rslt = bme68x_init(&bme);
-    bme68x_check_rslt("bme68x_init", rslt);
-
     /* Check if rslt == BME68X_OK, report or handle if otherwise */
-    rslt = bme68x_get_conf(&conf, &bme);
+    rslt = bme68x_get_conf(&conf, bme);
     bme68x_check_rslt("bme68x_get_conf", rslt);
 
     /* Check if rslt == BME68X_OK, report or handle if otherwise */
@@ -43,7 +32,7 @@ int bme68x_sequential_mode(void)
     conf.os_hum = BME68X_OS_16X;
     conf.os_pres = BME68X_OS_1X;
     conf.os_temp = BME68X_OS_2X;
-    rslt = bme68x_set_conf(&conf, &bme);
+    rslt = bme68x_set_conf(&conf, bme);
     bme68x_check_rslt("bme68x_set_conf", rslt);
 
     /* Check if rslt == BME68X_OK, report or handle if otherwise */
@@ -51,11 +40,11 @@ int bme68x_sequential_mode(void)
     heatr_conf.heatr_temp_prof = temp_prof;
     heatr_conf.heatr_dur_prof = dur_prof;
     heatr_conf.profile_len = 10;
-    rslt = bme68x_set_heatr_conf(BME68X_SEQUENTIAL_MODE, &heatr_conf, &bme);
+    rslt = bme68x_set_heatr_conf(BME68X_SEQUENTIAL_MODE, &heatr_conf, bme);
     bme68x_check_rslt("bme68x_set_heatr_conf", rslt);
 
     /* Check if rslt == BME68X_OK, report or handle if otherwise */
-    rslt = bme68x_set_op_mode(BME68X_SEQUENTIAL_MODE, &bme);
+    rslt = bme68x_set_op_mode(BME68X_SEQUENTIAL_MODE, bme);
     bme68x_check_rslt("bme68x_set_op_mode", rslt);
 
     /* Check if rslt == BME68X_OK, report or handle if otherwise */
@@ -64,12 +53,12 @@ int bme68x_sequential_mode(void)
     while (sample_count <= SAMPLE_COUNT)
     {
         /* Calculate delay period in microseconds */
-        del_period = bme68x_get_meas_dur(BME68X_SEQUENTIAL_MODE, &conf, &bme) + (heatr_conf.heatr_dur_prof[0] * 1000);
-        bme.delay_us(del_period, bme.intf_ptr);
+        del_period = bme68x_get_meas_dur(BME68X_SEQUENTIAL_MODE, &conf, bme) + (heatr_conf.heatr_dur_prof[0] * 1000);
+        bme->delay_us(del_period, bme->intf_ptr);
 
         time_ms = ztimer_now(ZTIMER_MSEC);
 
-        rslt = bme68x_get_data(BME68X_SEQUENTIAL_MODE, data, &n_fields, &bme);
+        rslt = bme68x_get_data(BME68X_SEQUENTIAL_MODE, data, &n_fields, bme);
         bme68x_check_rslt("bme68x_get_data", rslt);
 
         /* Check if rslt == BME68X_OK, report or handle if otherwise */
