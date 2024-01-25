@@ -14,6 +14,8 @@ USEMODULE += printf_float
 USEMODULE += ztimer_usec
 USEMODULE += ztimer_msec
 USEMODULE += bme68x bme68x_i2c bme68x_fp
+# needed for floating point
+CFLAGS += -DTHREAD_STACKSIZE_DEFAULT=2048
 
 CFLAGS += -DACME0_BUS_MODE=MODE_I2C -DACME1_BUS_MODE=MODE_I2C -DACME2_BUS_MODE=MODE_I2C
 SENSOR1 := "{.ifsel=BME68X_I2C_INTF,.intf.i2c.dev=ACME0_I2C_DEV,.intf.i2c.addr=BME68X_I2C_ADDR_1}"
