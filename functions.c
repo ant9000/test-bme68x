@@ -4,17 +4,20 @@
 #include "ztimer.h"
 #include "functions.h"
 
+#define ENABLE_DEBUG 0
+#include "debug.h"
+
 /*
  * Macro definition for valid new data (0x80) AND
  * heater stability (0x10) AND gas resistance (0x20) values
  */
-#define BME68X_VALID_DATA  UINT8_C(0xB0)
+#define BME68X_VALID_DATA \
+   BME68X_NEW_DATA_MSK + BME68X_GASM_VALID_MSK + BME68X_HEAT_STAB_MSK
 
 int bme68x_forced_mode(bme68x_t *dev)
 {
-    struct bme68x_dev *bme = &BME68X_SENSOR(dev);
     int8_t rslt;
-    struct bme68x_data data;
+    bme68x_data_t data;
     uint32_t del_period;
     uint32_t time_ms = 0;
     uint8_t n_fields;
@@ -40,14 +43,14 @@ int bme68x_forced_mode(bme68x_t *dev)
         bme68x_check_rslt("bme68x_start_measure", rslt);
 
         /* Calculate delay period in microseconds */
-        del_period = bme68x_get_meas_dur(dev->config.op_mode, &dev->config.sensors, bme) + (dev->config.heater.heatr_dur * 1000);
-        bme->delay_us(del_period, bme->intf_ptr);
+        del_period = bme68x_get_measure_duration(dev) + (dev->config.heater.heatr_dur * 1000);
+        bme68x_wait_us(dev, del_period);
 
         time_ms = ztimer_now(ZTIMER_MSEC);
 
         /* Check if rslt == BME68X_OK, report or handle if otherwise */
-        rslt = bme68x_get_data(dev->config.op_mode, &data, &n_fields, bme);
-        bme68x_check_rslt("bme68x_get_data", rslt);
+        rslt = bme68x_get_measure_data(dev, &data, &n_fields);
+        bme68x_check_rslt("bme68x_get_measure_data", rslt);
 
         if (n_fields)
         {
@@ -79,9 +82,8 @@ int bme68x_forced_mode(bme68x_t *dev)
 
 int bme68x_sequential_mode(bme68x_t *dev)
 {
-    struct bme68x_dev *bme = &BME68X_SENSOR(dev);
     int8_t rslt;
-    struct bme68x_data data[3];
+    bme68x_data_t data[3];
     uint32_t del_period;
     uint32_t time_ms = 0;
     uint8_t n_fields;
@@ -116,13 +118,13 @@ int bme68x_sequential_mode(bme68x_t *dev)
     while (sample_count <= SAMPLE_COUNT)
     {
         /* Calculate delay period in microseconds */
-        del_period = bme68x_get_meas_dur(dev->config.op_mode, &dev->config.sensors, bme) + (dev->config.heater.heatr_dur_prof[0] * 1000);
-        bme->delay_us(del_period, bme->intf_ptr);
+        del_period = bme68x_get_measure_duration(dev) + (dev->config.heater.heatr_dur_prof[0] * 1000);
+        bme68x_wait_us(dev, del_period);
 
         time_ms = ztimer_now(ZTIMER_MSEC);
 
-        rslt = bme68x_get_data(dev->config.op_mode, data, &n_fields, bme);
-        bme68x_check_rslt("bme68x_get_data", rslt);
+        rslt = bme68x_get_measure_data(dev, data, &n_fields);
+        bme68x_check_rslt("bme68x_get_measure_data", rslt);
 
         /* Check if rslt == BME68X_OK, report or handle if otherwise */
         for (uint8_t i = 0; i < n_fields; i++)
@@ -159,9 +161,8 @@ int bme68x_sequential_mode(bme68x_t *dev)
 
 int bme68x_parallel_mode(bme68x_t *dev)
 {
-    struct bme68x_dev *bme = &BME68X_SENSOR(dev);
     int8_t rslt;
-    struct bme68x_data data[3];
+    bme68x_data_t data[3];
     uint32_t del_period;
     uint8_t n_fields;
     uint32_t time_ms = 0;
@@ -184,7 +185,7 @@ int bme68x_parallel_mode(bme68x_t *dev)
     dev->config.heater.heatr_dur_prof = mul_prof;
     dev->config.heater.profile_len = 10;
     /* Shared heating duration in milliseconds */
-    dev->config.heater.shared_heatr_dur = (uint16_t)(140 - (bme68x_get_meas_dur(dev->config.op_mode, &dev->config.sensors, bme) / 1000));
+    dev->config.heater.shared_heatr_dur = 140;
 
     rslt = bme68x_apply_config(dev);
     bme68x_check_rslt("bme68x_apply_config", rslt);
@@ -202,13 +203,13 @@ int bme68x_parallel_mode(bme68x_t *dev)
     while (sample_count <= SAMPLE_COUNT)
     {
         /* Calculate delay period in microseconds */
-        del_period = bme68x_get_meas_dur(dev->config.op_mode, &dev->config.sensors, bme) + (dev->config.heater.shared_heatr_dur * 1000);
-        bme->delay_us(del_period, bme->intf_ptr);
+        del_period = dev->config.heater.shared_heatr_dur * 1000;
+        bme68x_wait_us(dev, del_period);
 
         time_ms = ztimer_now(ZTIMER_MSEC);
 
-        rslt = bme68x_get_data(dev->config.op_mode, data, &n_fields, bme);
-        bme68x_check_rslt("bme68x_get_data", rslt);
+        rslt = bme68x_get_measure_data(dev, data, &n_fields);
+        bme68x_check_rslt("bme68x_get_measure_data", rslt);
 
         /* Check if rslt == BME68X_OK, report or handle if otherwise */
         for (uint8_t i = 0; i < n_fields; i++)
@@ -270,7 +271,7 @@ void bme68x_check_rslt(const char api_name[], int8_t rslt)
             printf("API name [%s]  Error [%d] : Self test error\r\n", api_name, rslt);
             break;
         case BME68X_W_NO_NEW_DATA:
-            printf("API name [%s]  Warning [%d] : No new data found\r\n", api_name, rslt);
+            DEBUG("API name [%s]  Warning [%d] : No new data found\r\n", api_name, rslt);
             break;
         default:
             printf("API name [%s]  Error [%d] : Unknown error code\r\n", api_name, rslt);
