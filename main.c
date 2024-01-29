@@ -8,11 +8,17 @@ int main(void) {
     for (unsigned i = 0; i < BME68X_NUMOF; i++) {
         printf("Initialize BME68X sensor %u ... ", i);
         if (bme68x_init(&dev[i], &bme68x_params[i]) != BME68X_OK) {
-            puts("failed");
+            puts("failed.");
             dev[i].sensor.chip_id = 0;
-        }
-        else {
-            puts("OK");
+        } else {
+            puts("OK.");
+            printf("Self test ... "); fflush(stdout);
+            int res = bme68x_self_test(&dev[i]);
+            if (res != BME68X_OK) {
+                puts("failed.");
+            } else {
+                puts("OK.");
+            }
         }
     }
     for (unsigned i = 0, j = 0; i < BME68X_NUMOF; i++) {
