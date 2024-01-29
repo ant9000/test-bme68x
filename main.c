@@ -15,10 +15,10 @@ int main(void) {
             puts("OK");
         }
     }
-    for (unsigned i = 0; i < BME68X_NUMOF; i++) {
+    for (unsigned i = 0, j = 0; i < BME68X_NUMOF; i++) {
         printf(">>> Sensor %d: ", i);
         if (dev[i].sensor.chip_id == BME68X_CHIP_ID) {
-            switch (i % 3) {
+            switch (j++ % 3) {
             case 0:
                 puts("forced mode.");
                 bme68x_forced_mode(&dev[i]);
